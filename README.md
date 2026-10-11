@@ -1,13 +1,19 @@
 # E92Redline
 
-A production-grade diagnostic GUI tool for BMW E92 M3 using SocketCAN. Provides ISTA-style guided workflows for vehicle diagnostics on Linux.
+A live data dashboard and diagnostic GUI tool for the BMW E92 M3 (S65) using SocketCAN on Linux. Watch RPM, timing, fuel trims, temperatures and more in real time, alongside ISTA-style guided workflows for fault codes and service functions.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux-orange.svg)
 
+![Live Data page](docs/images/live-data.png)
+
 ## Features
 
+- **Live Data Dashboard**: Real-time RPM with a redline bar, 13 more engine values as tiles, and a scrolling 30-second plot of RPM and throttle
+- **Metric / Imperial Toggle**: Switch between °C, km/h, g/s and °F, mph, lb/min; your choice is remembered between launches
+- **CSV Logging**: Record a drive to a CSV file for review afterward
+- **Built-in ECU Simulator**: Develop and test the dashboard without the car using a virtual CAN bus
 - **ISTA-Style Guided Workflows**: Step-by-step wizards for diagnostics
 - **Quick Test (Module Scan)**: Discover and probe all ECU modules
 - **Fault Memory Management**: Read, display, search, and clear DTCs
@@ -80,8 +86,9 @@ Core dependencies are installed automatically:
 - PyQt6 (GUI framework)
 - python-can (CAN bus support)
 - can-isotp (ISO-TP protocol)
-- pyyaml (configuration)
+- pyyaml (configuration and live data definitions)
 - platformdirs (platform paths)
+- pyqtgraph (live data plots)
 
 ## Hardware Setup
 
@@ -193,7 +200,27 @@ options:
 4. Select DTCs to view details
 5. Clear DTCs with confirmation dialogs
 
-### 4. Service Functions
+### 4. Live Data
+
+1. Connect to the vehicle (see step 1). The engine can be running.
+2. Navigate to "Live Data"
+3. Optionally tick **Imperial units** and/or **Log to CSV**
+4. Click "Start" to begin polling, and "Stop" when finished
+
+The page polls standard OBD-II values from the engine computer, each at its own rate:
+
+| Value | Rate | Value | Rate |
+|-------|------|-------|------|
+| Engine RPM | 10 Hz | Short-term fuel trim (banks 1 & 2) | 2 Hz |
+| Timing advance | 5 Hz | Long-term fuel trim (banks 1 & 2) | 0.5 Hz |
+| Engine load | 5 Hz | Coolant temperature | 1 Hz |
+| Throttle position | 5 Hz | Intake air temperature | 1 Hz |
+| Mass air flow | 5 Hz | Ambient air temperature | 0.2 Hz |
+| Vehicle speed | 5 Hz | Module voltage | 1 Hz |
+
+The RPM bar turns amber above 7,500 rpm. If a tile stays at `--`, the car isn't answering that value over OBD-II (see Troubleshooting).
+
+### 5. Service Functions
 
 **Battery Registration:**
 1. Navigate to "Service Functions"
@@ -208,7 +235,7 @@ options:
 3. Select reset type (Soft/Key Off-On)
 4. Confirm and execute
 
-### 5. Export Session
+### 6. Export Session
 
 1. Navigate to "Export Session"
 2. Select what to include
@@ -216,6 +243,10 @@ options:
 4. Share with technicians or for records
 
 ## Troubleshooting
+
+### A Live Data tile stays at "--"
+
+The engine computer doesn't report that value over standard OBD-II. The rest of the page keeps working; the poller simply skips values that get no reply. Some S65-specific data (such as per-cylinder misfire counts) is only available through BMW's own diagnostic identifiers and isn't supported yet.
 
 ### "No CAN interfaces detected"
 
@@ -259,6 +290,18 @@ logging:
   log_dir: ./logs
 ```
 
+## Adding Live Data Values
+
+Live values are defined in `src/e92_redline/live_data/pids.yaml`. Each entry is a standard OBD-II Mode 01 PID with a formula over its raw data bytes `A`, `B`, ...:
+
+```yaml
+- {id: coolant, name: Coolant Temp, pid: 0x05, bytes: 1, formula: "A - 40", unit: "°C", hz: 1}
+```
+
+- `unit` is always metric; the page converts °C, km/h and g/s for imperial display
+- `hz` is how often the value is polled. Total throughput is roughly 15–30 requests per second, so keep slow-changing values at low rates
+- A new entry gets a tile automatically
+
 ## Datapacks
 
 Additional module definitions can be loaded from user datapacks.
@@ -280,6 +323,25 @@ pytest
 pytest --cov=e92_redline --cov-report=html
 ```
 
+### Testing Without a Car
+
+`tools/fake_ecu.py` simulates the engine computer on a virtual CAN bus, answering every Live Data request with a sweeping RPM and plausible values.
+
+```bash
+# One-time per boot: create the virtual CAN interface
+sudo modprobe vcan
+sudo ip link add dev vcan0 type vcan
+sudo ip link set vcan0 up
+
+# Terminal 1: start the simulated ECU
+python tools/fake_ecu.py
+
+# Terminal 2: run the app, connect to vcan0, open Live Data, click Start
+e92-redline
+```
+
+Install `can-utils` and run `candump vcan0` to watch the raw requests and replies.
+
 ### Code Quality
 
 ```bash
@@ -299,6 +361,14 @@ All diagnostic actions are logged to `./logs/` in JSONL format for audit purpose
 
 ```json
 {"timestamp": "2024-01-15T10:30:00", "level": "INFO", "action": "clear_dtc", "module_id": "DME", "success": true}
+```
+
+When **Log to CSV** is ticked, Live Data is recorded to `./logs/live_YYYYMMDD_HHMMSS.csv`, one row per reading. Values are always stored in metric units, regardless of the display toggle:
+
+```csv
+seconds,value_id,value
+0.012,rpm,812.500
+0.118,timing,12.000
 ```
 
 ## Safety and Security
