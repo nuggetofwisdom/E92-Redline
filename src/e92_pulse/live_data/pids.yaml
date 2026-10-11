@@ -1,0 +1,14 @@
+pids:
+  - {id: rpm,      name: Engine RPM,      pid: 0x0C, bytes: 2, formula: "(A*256 + B) / 4",   unit: rpm,  hz: 10}
+  - {id: timing,   name: Timing Advance,  pid: 0x0E, bytes: 1, formula: "A / 2 - 64",        unit: "°",  hz: 5}
+  - {id: load,     name: Engine Load,     pid: 0x04, bytes: 1, formula: "A * 100 / 255",     unit: "%",  hz: 5}
+  - {id: throttle, name: Throttle,        pid: 0x11, bytes: 1, formula: "A * 100 / 255",     unit: "%",  hz: 5}
+  - {id: maf,      name: Mass Air Flow,   pid: 0x10, bytes: 2, formula: "(A*256 + B) / 100", unit: g/s,  hz: 5}
+  - {id: speed,    name: Speed,           pid: 0x0D, bytes: 1, formula: "A",                 unit: km/h, hz: 5}
+  - {id: stft1,    name: STFT Bank 1,     pid: 0x06, bytes: 1, formula: "(A - 128) * 100 / 128", unit: "%", hz: 2}
+  - {id: stft2,    name: STFT Bank 2,     pid: 0x08, bytes: 1, formula: "(A - 128) * 100 / 128", unit: "%", hz: 2}
+  - {id: ltft1,    name: LTFT Bank 1,     pid: 0x07, bytes: 1, formula: "(A - 128) * 100 / 128", unit: "%", hz: 0.5}
+  - {id: ltft2,    name: LTFT Bank 2,     pid: 0x09, bytes: 1, formula: "(A - 128) * 100 / 128", unit: "%", hz: 0.5}
+  - {id: coolant,  name: Coolant Temp,    pid: 0x05, bytes: 1, formula: "A - 40",            unit: "°C", hz: 1}
+  - {id: iat,      name: Intake Air Temp, pid: 0x0F, bytes: 1, formula: "A - 40",            unit: "°C", hz: 1}
+  - {id: voltage,  name: Module Voltage,  pid: 0x42, bytes: 2, formula: "(A*256 + B) / 1000", unit: V,   hz: 1}
