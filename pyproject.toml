@@ -34,6 +34,7 @@ dependencies = [
     "udsoncan>=1.21",
     "pyyaml>=6.0",
     "platformdirs>=4.0.0",
+    "pyqtgraph>=0.13",
 ]
 
 [project.optional-dependencies]

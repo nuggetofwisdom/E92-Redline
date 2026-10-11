@@ -420,6 +420,7 @@ class MainWindow(QMainWindow):
             ("connect", "Connect", ""),
             ("quick_test", "Quick Test", ""),
             ("fault_memory", "Fault Memory", ""),
+            ("live_data", "Live Data", ""),
             ("services", "Service Functions", ""),
             ("export", "Export Session", ""),
         ]
@@ -453,6 +454,7 @@ class MainWindow(QMainWindow):
         from e92_pulse.gui.pages.fault_memory_page import FaultMemoryPage
         from e92_pulse.gui.pages.services_page import ServicesPage
         from e92_pulse.gui.pages.export_page import ExportPage
+        from e92_pulse.gui.pages.live_data_page import LiveDataPage
 
         self._pages: dict[str, QWidget] = {}
 
@@ -485,6 +487,11 @@ class MainWindow(QMainWindow):
         )
         self._pages["fault_memory"] = fault_memory
         self._content_stack.addWidget(fault_memory)
+
+        # Live Data page
+        live_data = LiveDataPage(self)
+        self._pages["live_data"] = live_data
+        self._content_stack.addWidget(live_data)
 
         # Services page
         services = ServicesPage(
@@ -623,6 +630,8 @@ class MainWindow(QMainWindow):
             self._pages["quick_test"].set_scanner(self._module_scanner)
             self._pages["fault_memory"].set_uds_client(self._uds_client)
             self._pages["services"].set_service_manager(self._service_manager)
+            iface = self._connection_manager.current_interface
+            self._pages["live_data"].set_channel(iface.name if iface else None)
 
             # Try to read VIN from vehicle
             self._read_vehicle_info()
@@ -639,6 +648,7 @@ class MainWindow(QMainWindow):
 
     def _on_disconnected(self) -> None:
         """Handle disconnection."""
+        self._pages["live_data"].set_channel(None)
         self._enable_pages(False)
         self._vehicle_info_panel.clear_info()
         self.connection_changed.emit(False)
