@@ -1,3 +1,5 @@
+# Standard OBD-II Mode 01 values. A and B are the raw data bytes.
+# Units here are always metric; the Live Data page converts for display.
 pids:
   - {id: rpm,      name: Engine RPM,      pid: 0x0C, bytes: 2, formula: "(A*256 + B) / 4",   unit: rpm,  hz: 10}
   - {id: timing,   name: Timing Advance,  pid: 0x0E, bytes: 1, formula: "A / 2 - 64",        unit: "°",  hz: 5}
@@ -11,4 +13,5 @@ pids:
   - {id: ltft2,    name: LTFT Bank 2,     pid: 0x09, bytes: 1, formula: "(A - 128) * 100 / 128", unit: "%", hz: 0.5}
   - {id: coolant,  name: Coolant Temp,    pid: 0x05, bytes: 1, formula: "A - 40",            unit: "°C", hz: 1}
   - {id: iat,      name: Intake Air Temp, pid: 0x0F, bytes: 1, formula: "A - 40",            unit: "°C", hz: 1}
+  - {id: ambient,  name: Ambient Temp,    pid: 0x46, bytes: 1, formula: "A - 40",            unit: "°C", hz: 0.2}
   - {id: voltage,  name: Module Voltage,  pid: 0x42, bytes: 2, formula: "(A*256 + B) / 1000", unit: V,   hz: 1}

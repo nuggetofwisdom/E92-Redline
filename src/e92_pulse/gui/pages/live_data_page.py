@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pyqtgraph as pg
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QSettings, QTimer
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 from e92_pulse.core.app_logging import get_logger
 from e92_pulse.live_data.definitions import PidDef, load_pids
 from e92_pulse.live_data.poller import LivePoller
+from e92_pulse.live_data.units import convert, display_unit
 
 logger = get_logger(__name__)
 
@@ -37,10 +38,13 @@ PLOTTED = ("rpm", "throttle")  # values drawn on the history plot
 
 
 class ValueTile(QFrame):
-    """One live value: name, big number, unit."""
+    """One live value: name, big number, unit. Values arrive metric."""
 
     def __init__(self, pid: PidDef, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._pid = pid
+        self._imperial = False
+        self._raw: float | None = None
         self.setStyleSheet(
             "QFrame { background: #252526; border: 1px solid #3c3c3c; border-radius: 6px; }"
             "QLabel { border: none; }"
@@ -51,14 +55,22 @@ class ValueTile(QFrame):
         self._value = QLabel("--")
         self._value.setFont(QFont("Sans", 22, QFont.Weight.Bold))
         self._value.setStyleSheet("color: #ffffff;")
-        unit = QLabel(pid.unit)
-        unit.setStyleSheet("color: #0099ff;")
+        self._unit = QLabel(pid.unit)
+        self._unit.setStyleSheet("color: #0099ff;")
         layout.addWidget(name)
         layout.addWidget(self._value)
-        layout.addWidget(unit)
+        layout.addWidget(self._unit)
 
     def set_value(self, value: float) -> None:
-        self._value.setText(f"{value:.0f}" if abs(value) >= 100 else f"{value:.1f}")
+        self._raw = value
+        shown, _ = convert(value, self._pid.unit, self._imperial)
+        self._value.setText(f"{shown:.0f}" if abs(shown) >= 100 else f"{shown:.1f}")
+
+    def set_imperial(self, imperial: bool) -> None:
+        self._imperial = imperial
+        self._unit.setText(display_unit(self._pid.unit, imperial))
+        if self._raw is not None:
+            self.set_value(self._raw)
 
 
 class LiveDataPage(QWidget):
@@ -74,7 +86,11 @@ class LiveDataPage(QWidget):
         }
         self._log_file = None
         self._log_writer = None
+        self._settings = QSettings("E92-Redline", "LiveData")
         self._build_ui()
+        imperial = self._settings.value("imperial", False, type=bool)
+        self._units_box.setChecked(imperial)
+        self._apply_units(imperial)
 
         # Redraw the plot at a steady 10 fps rather than on every sample.
         self._plot_timer = QTimer(self)
@@ -91,6 +107,9 @@ class LiveDataPage(QWidget):
         title.setFont(QFont("Sans", 18, QFont.Weight.Bold))
         header.addWidget(title)
         header.addStretch()
+        self._units_box = QCheckBox("Imperial units")
+        self._units_box.toggled.connect(self._on_units_toggled)
+        header.addWidget(self._units_box)
         self._log_box = QCheckBox("Log to CSV")
         header.addWidget(self._log_box)
         self._start_btn = QPushButton("Start")
@@ -121,7 +140,7 @@ class LiveDataPage(QWidget):
         for i, pid in enumerate(tile_pids):
             tile = ValueTile(pid)
             self._tiles[pid.id] = tile
-            grid.addWidget(tile, i // 4, i % 4)
+            grid.addWidget(tile, i // 5, i % 5)
         root.addLayout(grid)
 
         # History plot
@@ -152,6 +171,16 @@ class LiveDataPage(QWidget):
             "QProgressBar { background: #252526; border: 1px solid #3c3c3c; border-radius: 4px; }"
             f"QProgressBar::chunk {{ background: {color}; border-radius: 4px; }}"
         )
+
+    # ---------- units ----------
+
+    def _on_units_toggled(self, imperial: bool) -> None:
+        self._settings.setValue("imperial", imperial)
+        self._apply_units(imperial)
+
+    def _apply_units(self, imperial: bool) -> None:
+        for tile in self._tiles.values():
+            tile.set_imperial(imperial)
 
     # ---------- wiring from MainWindow ----------
 
