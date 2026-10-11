@@ -1,4 +1,4 @@
-# E92 Pulse
+# E92Redline
 
 A production-grade diagnostic GUI tool for BMW E92 M3 using SocketCAN. Provides ISTA-style guided workflows for vehicle diagnostics on Linux.
 
@@ -63,8 +63,8 @@ Search Amazon for:
 
 ```bash
 # Clone the repository
-git clone https://github.com/Reese-afk/E92-Pulse.git
-cd E92-Pulse
+git clone https://github.com/nuggetofwisdom/E92-Redline.git
+cd E92-Redline
 
 # Create virtual environment
 python3.11 -m venv venv
@@ -140,21 +140,21 @@ ACTION=="add", SUBSYSTEM=="net", KERNEL=="can*", RUN+="/sbin/ip link set %k up t
 source venv/bin/activate
 
 # Run using module
-python -m e92_pulse
+python -m e92_redline
 
 # Or using console script (after pip install)
-e92-pulse
+e92-redline
 
 # With debug logging
-e92-pulse --debug
+e92-redline --debug
 ```
 
 ### Command Line Options
 
 ```
-usage: e92-pulse [-h] [--debug] [--log-dir LOG_DIR] [--config CONFIG] [--version]
+usage: e92-redline [-h] [--debug] [--log-dir LOG_DIR] [--config CONFIG] [--version]
 
-E92 Pulse - BMW E92 M3 Diagnostic Tool
+E92Redline - BMW E92 M3 Diagnostic Tool
 
 options:
   -h, --help         show this help message and exit
@@ -172,7 +172,7 @@ options:
 2. Connect DB9-to-OBD2 cable to USB2CAN and vehicle
 3. Turn ignition ON (engine OFF recommended)
 4. Set up CAN interface: `sudo ip link set can0 up type can bitrate 500000`
-5. Launch E92 Pulse: `python -m e92_pulse`
+5. Launch E92Redline: `python -m e92_redline`
 6. The app will detect `can0` - click "Connect"
 7. Vehicle info (VIN, series, engine) will display in the sidebar
 
@@ -245,10 +245,10 @@ options:
 
 ## Configuration
 
-Configuration is stored in `~/.config/e92_pulse/config.yaml`:
+Configuration is stored in `~/.config/e92_redline/config.yaml`:
 
 ```yaml
-datapacks_dir: ~/.config/e92_pulse/datapacks
+datapacks_dir: ~/.config/e92_redline/datapacks
 connection:
   timeout: 1.0
 ui:
@@ -263,7 +263,7 @@ logging:
 
 Additional module definitions can be loaded from user datapacks.
 
-Place datapack files in `~/.config/e92_pulse/datapacks/`.
+Place datapack files in `~/.config/e92_redline/datapacks/`.
 
 ## Development
 
@@ -277,7 +277,7 @@ pip install -e ".[dev]"
 pytest
 
 # Run with coverage
-pytest --cov=e92_pulse --cov-report=html
+pytest --cov=e92_redline --cov-report=html
 ```
 
 ### Code Quality

@@ -1,5 +1,5 @@
-# Example Datapack for E92 Pulse
-# Place this file in ~/.config/e92_pulse/datapacks/
+# Example Datapack for E92Redline
+# Place this file in ~/.config/e92_redline/datapacks/
 #
 # IMPORTANT: This is an example template. Do NOT include proprietary BMW data.
 # Only use publicly available information or your own definitions.
@@ -10,9 +10,9 @@ metadata:
   name: "Example Datapack"
   version: "1.0.0"
   description: "Example datapack showing the schema format"
-  author: "E92 Pulse Contributors"
+  author: "E92Redline Contributors"
   license: "MIT"
-  # Minimum E92 Pulse version required
+  # Minimum E92Redline version required
   requires_version: ">=0.1.0"
 
 # Additional module definitions

@@ -4,7 +4,7 @@ Tests for port discovery and selection heuristics.
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from e92_pulse.core.discovery import PortDiscovery, PortInfo, ChipType, rank_ports_for_kdcan
+from e92_redline.core.discovery import PortDiscovery, PortInfo, ChipType, rank_ports_for_kdcan
 
 
 class TestPortInfo:

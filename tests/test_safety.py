@@ -3,7 +3,7 @@ Tests for safety manager blocks.
 """
 
 import pytest
-from e92_pulse.core.safety import SafetyManager, SafetyCategory, SafetyViolation
+from e92_redline.core.safety import SafetyManager, SafetyCategory, SafetyViolation
 
 
 class TestSafetyManager:

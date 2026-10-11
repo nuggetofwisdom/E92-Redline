@@ -1,14 +1,14 @@
 """
-Pytest configuration and fixtures for E92 Pulse tests.
+Pytest configuration and fixtures for E92Redline tests.
 """
 
 import pytest
 from pathlib import Path
 
-from e92_pulse.core.config import AppConfig
-from e92_pulse.core.safety import SafetyManager
-from e92_pulse.core.vehicle import VehicleProfile
-from e92_pulse.bmw.module_registry import ModuleRegistry
+from e92_redline.core.config import AppConfig
+from e92_redline.core.safety import SafetyManager
+from e92_redline.core.vehicle import VehicleProfile
+from e92_redline.bmw.module_registry import ModuleRegistry
 
 
 @pytest.fixture

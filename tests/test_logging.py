@@ -6,7 +6,7 @@ import pytest
 import json
 from pathlib import Path
 
-from e92_pulse.core.app_logging import (
+from e92_redline.core.app_logging import (
     setup_logging,
     get_logger,
     get_session_id,
@@ -32,7 +32,7 @@ class TestLogging:
 
         logger = get_logger("test")
         assert logger is not None
-        assert "e92_pulse" in logger.name
+        assert "e92_redline" in logger.name
 
     def test_get_session_id(self, temp_dir: Path):
         """Test session ID generation."""

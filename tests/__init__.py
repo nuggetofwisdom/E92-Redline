@@ -1,3 +1,3 @@
 """
-E92 Pulse Test Suite
+E92Redline Test Suite
 """

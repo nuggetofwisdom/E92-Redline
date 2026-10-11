@@ -1,6 +1,6 @@
 # Linux Permissions Setup
 
-This guide covers the necessary Linux permissions and configuration for using E92 Pulse with K+DCAN USB cables.
+This guide covers the necessary Linux permissions and configuration for using E92Redline with K+DCAN USB cables.
 
 ## Quick Setup
 
@@ -60,10 +60,10 @@ For more control over device permissions and naming, create udev rules.
 
 ### Create udev Rule File
 
-Create `/etc/udev/rules.d/99-e92-pulse.rules`:
+Create `/etc/udev/rules.d/99-e92-redline.rules`:
 
 ```bash
-sudo nano /etc/udev/rules.d/99-e92-pulse.rules
+sudo nano /etc/udev/rules.d/99-e92-redline.rules
 ```
 
 ### FTDI Devices
@@ -109,7 +109,7 @@ sudo udevadm trigger
 
 ## Stable Device Paths
 
-E92 Pulse prefers stable device paths from `/dev/serial/by-id/` over dynamic `/dev/ttyUSB*` paths.
+E92Redline prefers stable device paths from `/dev/serial/by-id/` over dynamic `/dev/ttyUSB*` paths.
 
 ### Find Your Device's Stable Path
 
@@ -149,7 +149,7 @@ If your device isn't detected:
 
 ### Wrong Device Selected
 
-If E92 Pulse selects the wrong port:
+If E92Redline selects the wrong port:
 
 1. Unplug other USB serial devices
 2. Use the port dropdown to manually select
@@ -179,7 +179,7 @@ The dialout group approach is preferred over:
 
 ### Audit Trail
 
-E92 Pulse logs all diagnostic operations. Logs are stored in `./logs/` by default.
+E92Redline logs all diagnostic operations. Logs are stored in `./logs/` by default.
 
 ## Testing Your Setup
 
@@ -190,14 +190,14 @@ E92 Pulse logs all diagnostic operations. Logs are stored in `./logs/` by defaul
 python3 -c "import serial; s = serial.Serial('/dev/ttyUSB0', 115200, timeout=1); print('OK'); s.close()"
 ```
 
-### With E92 Pulse
+### With E92Redline
 
 ```bash
 # Run in simulation mode first
-e92-pulse --simulation
+e92-redline --simulation
 
 # Then test with real hardware
-e92-pulse --debug
+e92-redline --debug
 ```
 
 ## Virtual Machine Considerations

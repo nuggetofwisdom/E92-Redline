@@ -1,17 +1,17 @@
 # Datapacks
 
-Datapacks allow you to extend E92 Pulse with additional module definitions, DTC descriptions, and service routines without modifying the core application.
+Datapacks allow you to extend E92Redline with additional module definitions, DTC descriptions, and service routines without modifying the core application.
 
 ## Overview
 
-Datapacks are YAML or JSON files placed in `~/.config/e92_pulse/datapacks/`. They are automatically loaded when the application starts.
+Datapacks are YAML or JSON files placed in `~/.config/e92_redline/datapacks/`. They are automatically loaded when the application starts.
 
 **Important**: Datapacks must NOT contain proprietary BMW data. Only use publicly available information or your own definitions.
 
 ## Datapack Location
 
 ```
-~/.config/e92_pulse/
+~/.config/e92_redline/
 ├── config.yaml
 └── datapacks/
     ├── my_custom_modules.yaml
@@ -177,11 +177,11 @@ live_data:
 
 ## Loading Datapacks
 
-Datapacks are automatically loaded when E92 Pulse starts. To refresh:
+Datapacks are automatically loaded when E92Redline starts. To refresh:
 
-1. Close E92 Pulse
+1. Close E92Redline
 2. Modify datapack files
-3. Restart E92 Pulse
+3. Restart E92Redline
 
 ## Validation
 
@@ -194,7 +194,7 @@ Common validation errors:
 
 Check the application logs for validation errors:
 ```bash
-e92-pulse --debug
+e92-redline --debug
 ```
 
 ## Best Practices
