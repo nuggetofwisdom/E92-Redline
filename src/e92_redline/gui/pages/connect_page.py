@@ -2,11 +2,15 @@
 Connect Page
 
 Provides interface for connecting to the diagnostic interface.
-Handles CAN interface discovery, selection, and connection management.
+Lists K+DCAN cables (any OS) and SocketCAN interfaces (Linux), and handles
+selection and connection management.
 """
+
+import sys
 
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
+    QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -18,7 +22,7 @@ from PyQt6.QtWidgets import (
     QTextEdit,
     QMessageBox,
 )
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QCursor, QFont
 
 from e92_redline.core.connection import ConnectionManager, ConnectionState, InterfaceInfo
 from e92_redline.core.config import AppConfig
@@ -75,7 +79,7 @@ class ConnectPage(QWidget):
         layout.addWidget(title)
 
         subtitle = QLabel(
-            "Select a SocketCAN interface to begin diagnostics"
+            "Plug in your K+DCAN cable (or a SocketCAN adapter) and select it below"
         )
         subtitle.setFont(QFont("Sans", 12))
         subtitle.setStyleSheet("color: #888888;")
@@ -99,11 +103,11 @@ class ConnectPage(QWidget):
         left_layout = QVBoxLayout(left_frame)
 
         # Interface selection
-        iface_group = QGroupBox("CAN Interface")
+        iface_group = QGroupBox("Adapter")
         iface_layout = QVBoxLayout(iface_group)
 
         # USB Adapter detection status
-        self._adapter_status = QLabel("Checking for USB CAN adapters...")
+        self._adapter_status = QLabel("Looking for adapters...")
         self._adapter_status.setStyleSheet("color: #888888; font-size: 11px;")
         self._adapter_status.setWordWrap(True)
         iface_layout.addWidget(self._adapter_status)
@@ -205,10 +209,9 @@ class ConnectPage(QWidget):
         req_layout = QVBoxLayout(req_group)
 
         requirements = [
-            "SocketCAN-compatible CAN adapter",
-            "  (PEAK PCAN-USB, Kvaser, CANable, etc.)",
-            "Vehicle ignition ON (engine OFF)",
-            "CAN interface configured at 500kbps",
+            "K+DCAN USB cable (FTDI-based, e.g. Bimmergeeks)",
+            "  or a SocketCAN adapter on Linux",
+            "Vehicle ignition ON (engine may run for Live Data)",
             "Stable 12V battery",
         ]
 
@@ -234,18 +237,7 @@ class ConnectPage(QWidget):
                 font-size: 11px;
             }
         """)
-        self._trouble_text.setHtml("""
-            <p style="color: #888888;">
-            <b>No CAN interfaces detected?</b><br>
-            - Connect your SocketCAN adapter<br>
-            - Set up interface with:<br>
-            <code style="color: #00cccc;">sudo ip link set can0 up type can bitrate 500000</code><br><br>
-            <b>Connection fails?</b><br>
-            - Ensure ignition is ON<br>
-            - Verify CAN adapter is recognized (dmesg)<br>
-            - Check can-utils: <code style="color: #00cccc;">candump can0</code>
-            </p>
-        """)
+        self._trouble_text.setHtml(_troubleshooting_html())
         trouble_layout.addWidget(self._trouble_text)
 
         right_layout.addWidget(trouble_group)
@@ -286,28 +278,27 @@ class ConnectPage(QWidget):
         self._connection_manager.add_state_callback(self._on_state_change)
 
     def _scan_interfaces(self) -> None:
-        """Scan for available CAN interfaces."""
+        """Scan for K+DCAN cables and CAN interfaces."""
         self._interface_combo.clear()
 
-        # First check for USB CAN adapters (even if not configured)
-        usb_adapters = detect_usb_can_adapters()
+        self._interfaces = self._connection_manager.discover_interfaces()
+        cables = [i for i in self._interfaces if i.interface_type == "kdcan"]
+        usb_adapters = detect_usb_can_adapters() if sys.platform.startswith("linux") else []
+
+        found = []
+        if cables:
+            found.append(f"{len(cables)} serial port(s)")
         if usb_adapters:
-            adapter_names = [a.get("name", "Unknown") for a in usb_adapters]
-            self._adapter_status.setText(
-                f"USB CAN adapter detected: {', '.join(adapter_names)}"
-            )
+            found.append("USB CAN adapter: " + ", ".join(a.get("name", "?") for a in usb_adapters))
+        if found:
+            self._adapter_status.setText("Found " + "; ".join(found))
             self._adapter_status.setStyleSheet("color: #00cc00; font-size: 11px;")
         else:
-            self._adapter_status.setText(
-                "No USB CAN adapter detected. Connect your Innomaker USB2CAN."
-            )
+            self._adapter_status.setText("No adapter found. Plug in your K+DCAN cable and click Rescan.")
             self._adapter_status.setStyleSheet("color: #cc6600; font-size: 11px;")
 
-        # Now check for configured SocketCAN interfaces
-        self._interfaces = self._connection_manager.discover_interfaces()
-
         if not self._interfaces:
-            self._interface_combo.addItem("No CAN interfaces detected")
+            self._interface_combo.addItem("No adapters detected")
             self._interface_combo.setEnabled(False)
             self._connect_btn.setEnabled(False)
             self._test_btn.setEnabled(False)
@@ -318,17 +309,16 @@ class ConnectPage(QWidget):
                     "Run: sudo ip link set can0 up type can bitrate 500000"
                 )
             else:
-                self._iface_details.setText(
-                    "No SocketCAN interfaces found.\n"
-                    "Connect a CAN adapter and configure it."
-                )
+                self._iface_details.setText(_no_adapter_hint())
         else:
             self._interface_combo.setEnabled(True)
             self._connect_btn.setEnabled(True)
             self._test_btn.setEnabled(True)
 
             for iface in self._interfaces:
-                if iface.interface_type == "virtual":
+                if iface.interface_type == "kdcan":
+                    display = f"{iface.name} - {iface.description}"
+                elif iface.interface_type == "virtual":
                     display = f"{iface.name} - Virtual CAN (Testing)"
                 else:
                     display = f"{iface.name} - CAN Interface @ 500kbps"
@@ -338,7 +328,7 @@ class ConnectPage(QWidget):
             self._interface_combo.setCurrentIndex(0)
             self._on_interface_selected(0)
 
-        logger.info(f"Interface scan: {len(self._interfaces)} CAN interface(s) found")
+        logger.info(f"Interface scan: {len(self._interfaces)} adapter(s) found")
 
     def _on_interface_selected(self, index: int) -> None:
         """Handle interface selection change."""
@@ -346,7 +336,12 @@ class ConnectPage(QWidget):
             return
 
         iface = self._interfaces[index]
-        if iface.interface_type == "virtual":
+        if iface.interface_type == "kdcan":
+            details = (
+                f"{iface.description}\n"
+                "BMW-FAST over USB serial, 115200 baud (car side: D-CAN 500 kbps)"
+            )
+        elif iface.interface_type == "virtual":
             details = "Virtual CAN interface for testing\nUse can-utils to inject messages"
         else:
             details = (
@@ -364,8 +359,8 @@ class ConnectPage(QWidget):
             QMessageBox.warning(
                 self,
                 "No Interface",
-                "Please select a CAN interface first.\n\n"
-                "Connect a SocketCAN adapter and click Rescan.",
+                "Please select an adapter first.\n\n"
+                "Plug in your K+DCAN cable and click Rescan.",
             )
             return
 
@@ -404,7 +399,7 @@ class ConnectPage(QWidget):
             self._status_label.setStyleSheet("color: #00cc00;")
             iface = self._connection_manager.current_interface
             if iface:
-                self._status_detail.setText(f"Connected to {iface.name}")
+                self._status_detail.setText(self._connected_detail(iface))
             self._connect_btn.setEnabled(False)
             self._disconnect_btn.setEnabled(True)
             self._rescan_btn.setEnabled(False)
@@ -418,7 +413,7 @@ class ConnectPage(QWidget):
         elif new_state == ConnectionState.VALIDATING:
             self._status_label.setText("Validating...")
             self._status_label.setStyleSheet("color: #cccc00;")
-            self._status_detail.setText("Checking CAN bus")
+            self._status_detail.setText("Talking to the adapter")
 
         elif new_state == ConnectionState.DISCONNECTED:
             self._status_label.setText("Disconnected")
@@ -439,18 +434,31 @@ class ConnectPage(QWidget):
             self._disconnect_btn.setEnabled(False)
             self._rescan_btn.setEnabled(True)
 
+    def _connected_detail(self, iface: InterfaceInfo) -> str:
+        if iface.interface_type != "kdcan":
+            return f"Connected to {iface.name}"
+        probe = getattr(self._connection_manager.get_transport(), "last_probe", {}) or {}
+        parts = [f"Connected to {iface.name}"]
+        if probe.get("ignition") is False:
+            parts.append("Ignition looks OFF")
+        parts.append("DME answered" if probe.get("dme") else "DME didn't answer yet")
+        return " · ".join(parts)
+
     def _on_test_adapter(self) -> None:
-        """Test the CAN adapter without connecting to a vehicle."""
+        """Test the selected adapter."""
         index = self._interface_combo.currentIndex()
         if index < 0 or index >= len(self._interfaces):
             QMessageBox.warning(
                 self,
                 "No Interface",
-                "Please select a CAN interface first.",
+                "Please select an adapter first.",
             )
             return
 
         iface = self._interfaces[index]
+        if iface.interface_type == "kdcan":
+            self._test_kdcan(iface)
+            return
         iface_name = iface.name
 
         # Get detailed interface status
@@ -521,3 +529,64 @@ class ConnectPage(QWidget):
                 "Adapter Test Failed",
                 "\n".join(results),
             )
+
+    def _test_kdcan(self, iface: InterfaceInfo) -> None:
+        """Open the cable, ping the DME, read RPM, and report."""
+        from e92_redline.kdcan_check import probe_cable
+
+        QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
+        try:
+            report = probe_cable(iface.name)
+        finally:
+            QApplication.restoreOverrideCursor()
+        text = "\n".join(report.lines)
+        if report.ok:
+            QMessageBox.information(self, "Cable Test Passed", text + "\n\nReady to connect.")
+        else:
+            QMessageBox.warning(self, "Cable Test", text)
+
+
+def _no_adapter_hint() -> str:
+    if sys.platform.startswith("linux"):
+        return (
+            "Plug in the K+DCAN cable (it appears as /dev/ttyUSB0).\n"
+            "Or bring up a CAN adapter: sudo ip link set can0 up type can bitrate 500000"
+        )
+    if sys.platform == "darwin":
+        return "Plug in the K+DCAN cable (it appears as /dev/cu.usbserial-…)."
+    return "Plug in the K+DCAN cable and check Device Manager > Ports (COM & LPT)."
+
+
+def _troubleshooting_html() -> str:
+    if sys.platform.startswith("linux"):
+        cable = (
+            "- Permission denied? Run "
+            '<code style="color: #00cccc;">sudo usermod -aG dialout $USER</code> '
+            "and log in again<br>"
+        )
+    elif sys.platform == "darwin":
+        cable = "- No driver needed; the cable shows up as /dev/cu.usbserial-…<br>"
+    else:
+        cable = (
+            "- Driver: Windows Update installs the FTDI driver automatically<br>"
+            "- Faster live data: Device Manager > the COM port > Port Settings > "
+            "Advanced > Latency Timer = 1<br>"
+        )
+    can = (
+        "<b>SocketCAN adapter?</b><br>"
+        '<code style="color: #00cccc;">sudo ip link set can0 up type can bitrate 500000</code><br>'
+        if sys.platform.startswith("linux")
+        else ""
+    )
+    return f"""
+        <p style="color: #888888;">
+        <b>K+DCAN cable not listed?</b><br>
+        {cable}
+        - Close INPA, ISTA or other apps holding the port<br><br>
+        <b>Connected but no data?</b><br>
+        - Ignition ON (key position 2), cable fully seated<br>
+        - If your cable has a K-line/D-CAN switch, set it to D-CAN<br>
+        - Run <code style="color: #00cccc;">e92-redline-cablecheck</code> for details<br><br>
+        {can}
+        </p>
+    """

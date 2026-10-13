@@ -254,3 +254,24 @@ class TestRankPortsForKdcan:
 
         result = rank_ports_for_kdcan([low_score, high_score])
         assert result[0].score >= result[1].score
+
+
+class TestCrossPlatformCandidates:
+    """Which serial ports count as possible K+DCAN cables on each OS."""
+
+    def test_windows_com_port_with_usb_ids(self):
+        assert PortDiscovery._is_candidate("COM3", 0x0403, "win32")
+
+    def test_windows_builtin_com_port_skipped(self):
+        assert not PortDiscovery._is_candidate("COM1", None, "win32")
+
+    def test_macos_prefers_cu_over_tty(self):
+        assert PortDiscovery._is_candidate("/dev/cu.usbserial-A12345", 0x0403, "darwin")
+        assert not PortDiscovery._is_candidate("/dev/tty.usbserial-A12345", 0x0403, "darwin")
+
+    def test_macos_bluetooth_port_skipped(self):
+        assert not PortDiscovery._is_candidate("/dev/cu.Bluetooth-Incoming-Port", None, "darwin")
+
+    def test_linux_onboard_serial_skipped(self):
+        assert not PortDiscovery._is_candidate("/dev/ttyS0", None, "linux")
+        assert PortDiscovery._is_candidate("/dev/ttyUSB0", None, "linux")

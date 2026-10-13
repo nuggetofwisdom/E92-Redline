@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "e92-redline"
 version = "0.1.0"
-description = "Production-grade diagnostic GUI tool for BMW E92 M3 using K+DCAN USB cable"
+description = "Live data dashboard and diagnostic tool for the BMW E92 M3 (S65) over a K+DCAN cable or SocketCAN"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
@@ -20,6 +20,8 @@ classifiers = [
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -49,6 +51,7 @@ dev = [
 
 [project.scripts]
 e92-redline = "e92_redline.app:main"
+e92-redline-cablecheck = "e92_redline.kdcan_check:main"
 
 [project.gui-scripts]
 e92-redline-gui = "e92_redline.app:main"

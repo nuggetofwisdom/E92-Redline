@@ -26,6 +26,9 @@ class ConnectionConfig:
     timeout: float = 1.0
     retry_count: int = 3
     auto_reconnect: bool = True
+    # Not saved: set from the command line for this run only.
+    extra_ports: list[str] = field(default_factory=list)  # e.g. a pty from tools/fake_kdcan.py
+    simulate: bool = False  # offer the built-in K+DCAN simulator
 
 
 @dataclass

@@ -428,15 +428,14 @@ class ExportPage(QWidget):
             )
 
     def _open_logs_folder(self) -> None:
-        """Open the logs folder in file manager."""
-        import subprocess
+        """Open the logs folder in the file manager (Explorer, Finder, ...)."""
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
 
         log_dir = get_log_dir()
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            subprocess.run(["xdg-open", str(log_dir)], check=True)
-        except Exception as e:
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_dir.resolve()))):
             QMessageBox.information(
                 self,
                 "Logs Folder",

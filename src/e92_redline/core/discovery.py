@@ -1,11 +1,16 @@
 """
 Port Discovery System
 
-Automatically detects K+DCAN USB diagnostic cables on Linux.
-Implements intelligent ranking and selection of diagnostic interfaces.
+Detects K+DCAN USB diagnostic cables on Linux, macOS and Windows, and ranks
+the candidates so the most likely cable is offered first:
+
+* Linux    /dev/ttyUSB*  (stable alias under /dev/serial/by-id preferred)
+* macOS    /dev/cu.usbserial-*  (the /dev/tty.* twin of each port is skipped:
+           opening it blocks until carrier detect)
+* Windows  COM*
 """
 
-import re
+import sys
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -31,7 +36,7 @@ class ChipType(IntEnum):
 class PortInfo:
     """Information about a detected serial port."""
 
-    device: str  # e.g., /dev/ttyUSB0
+    device: str  # e.g., /dev/ttyUSB0, /dev/cu.usbserial-A12345, COM3
     name: str  # Human-readable name
     description: str  # Detailed description
     hwid: str  # Hardware ID string
@@ -127,16 +132,11 @@ class PortDiscovery:
     def _create_port_info(self, port) -> PortInfo | None:
         """Create PortInfo from pyserial port info."""
         device = port.device
-
-        # Skip non-USB serial ports
-        if not any(
-            x in device for x in ("ttyUSB", "ttyACM", "serial")
-        ):
-            return None
-
-        # Extract VID:PID
         vid = port.vid
         pid = port.pid
+
+        if not self._is_candidate(device, vid):
+            return None
 
         # Determine chip type
         chip_type = ChipType.UNKNOWN
@@ -201,6 +201,22 @@ class PortDiscovery:
             by_id_path=by_id_path,
             score=base_score,
         )
+
+    @staticmethod
+    def _is_candidate(device: str, vid: int | None, platform: str | None = None) -> bool:
+        """Only USB serial ports can be a K+DCAN cable."""
+        platform = platform or sys.platform
+        if platform == "darwin":
+            # Each macOS port appears as /dev/tty.X and /dev/cu.X; only cu.* opens
+            # without waiting for carrier detect.
+            if device.startswith("/dev/tty."):
+                return False
+            if "bluetooth" in device.lower():
+                return False
+        if vid:
+            return True
+        # Some drivers don't report USB IDs; fall back to well-known names.
+        return any(x in device for x in ("ttyUSB", "ttyACM", "usbserial", "usbmodem"))
 
     def _find_by_id_path(self, device: str) -> str | None:
         """Find the stable /dev/serial/by-id path for a device."""

@@ -1,19 +1,21 @@
 # E92Redline
 
-A live data dashboard and diagnostic GUI tool for the BMW E92 M3 (S65) using SocketCAN on Linux. Watch RPM, timing, fuel trims, temperatures and more in real time, alongside ISTA-style guided workflows for fault codes and service functions.
+A live data dashboard and diagnostic GUI tool for the BMW E92 M3 (S65). Plug in a K+DCAN cable (or a SocketCAN adapter on Linux) and watch RPM, timing, fuel trims, temperatures and more in real time, alongside ISTA-style guided workflows for fault codes and service functions.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
-![Platform](https://img.shields.io/badge/platform-Linux-orange.svg)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-orange.svg)
 
 ![Live Data page](docs/images/live-data.png)
 
 ## Features
 
+- **Works with your K+DCAN cable**: Bimmergeeks and other FTDI-based K+DCAN cables on Linux, macOS and Windows, no extra drivers
 - **Live Data Dashboard**: Real-time RPM with a redline bar, 13 more engine values as tiles, and a scrolling 30-second plot of RPM and throttle
 - **Metric / Imperial Toggle**: Switch between °C, km/h, g/s and °F, mph, lb/min; your choice is remembered between launches
 - **CSV Logging**: Record a drive to a CSV file for review afterward
-- **Built-in ECU Simulator**: Develop and test the dashboard without the car using a virtual CAN bus
+- **Built-in Simulators**: Develop and test the dashboard without the car (simulated K+DCAN cable on any OS, or a virtual CAN bus on Linux)
+- **Cable Check**: `e92-redline-cablecheck` tells you whether the cable and car are talking, and how fast
 - **ISTA-Style Guided Workflows**: Step-by-step wizards for diagnostics
 - **Quick Test (Module Scan)**: Discover and probe all ECU modules
 - **Fault Memory Management**: Read, display, search, and clear DTCs
@@ -36,32 +38,24 @@ These restrictions are enforced at multiple layers and cannot be circumvented. A
 
 ## Hardware Requirements
 
-### Required Hardware
+Either of these works:
 
-| Item | Description | Approx. Cost |
-|------|-------------|--------------|
-| **Innomaker USB2CAN** | USB to CAN adapter (SocketCAN compatible) | ~$33 |
-| **DB9 to OBD2 Cable** | Connects USB2CAN to vehicle's OBD2 port | ~$18 |
+| Option | Hardware | Platforms |
+|--------|----------|-----------|
+| **K+DCAN cable** (recommended) | Bimmergeeks K+DCAN, or any FTDI FT232R-based K+DCAN "INPA" cable | Linux, macOS, Windows |
+| **SocketCAN adapter** | Innomaker USB2CAN + DB9-to-OBD2 cable (~$51), CANable, PEAK, Kvaser | Linux only |
 
-**Total: ~$51**
-
-### Where to Buy
-
-Search Amazon for:
-- `Innomaker USB2CAN` - Get the basic USB2CAN version ($32.99)
-- `Innomaker DB9 to OBD2 cable` - The one that says "fits USB to CAN Module of Innomaker" ($17.99)
+The K+DCAN cable is a USB serial port that relays BMW-FAST telegrams onto the car's diagnostic CAN bus. It needs no setup beyond what's in [docs/kdcan.md](docs/kdcan.md): joining the `dialout` group on Linux, nothing on macOS, and the automatically installed FTDI driver on Windows. If your cable has a K-line/D-CAN switch, set it to D-CAN.
 
 ### What NOT to Buy
 
-- **K+DCAN cables** - These don't work reliably on Linux (serial-based, not SocketCAN)
 - **ELM327 adapters** - Wrong protocol entirely
 - **USB to RS485 adapters** - Different protocol, won't work
 
 ### System Requirements
 
-- **Linux**: Ubuntu 22.04+, Fedora 38+, Debian 12+, or any distro with SocketCAN support
+- **Linux** (Ubuntu 22.04+, Fedora 38+, Debian 12+), **macOS** 12+, or **Windows** 10/11
 - **Python 3.11+**
-- **Kernel**: Linux 3.2+ (for gs_usb driver support)
 
 ## Installation
 
@@ -72,9 +66,9 @@ Search Amazon for:
 git clone https://github.com/nuggetofwisdom/E92-Redline.git
 cd E92-Redline
 
-# Create virtual environment
-python3.11 -m venv venv
-source venv/bin/activate
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 
 # Install in development mode
 pip install -e .
@@ -84,6 +78,7 @@ pip install -e .
 
 Core dependencies are installed automatically:
 - PyQt6 (GUI framework)
+- pyserial (K+DCAN cable)
 - python-can (CAN bus support)
 - can-isotp (ISO-TP protocol)
 - pyyaml (configuration and live data definitions)
@@ -92,47 +87,34 @@ Core dependencies are installed automatically:
 
 ## Hardware Setup
 
-### 1. Connect the Hardware
+### K+DCAN cable
+
+```
+[Laptop] --USB--> [K+DCAN cable] --> [OBD2 port, driver's footwell]
+```
+
+1. Plug the cable into the laptop. It shows up as `/dev/ttyUSB0` (Linux), `/dev/cu.usbserial-…` (macOS) or `COM3`-ish (Windows).
+2. Linux only, once: `sudo usermod -aG dialout $USER`, then log out and back in.
+3. Plug the cable into the car, ignition on, and check it: `e92-redline-cablecheck`
+
+Per-OS details, including the 1 ms latency setting that roughly doubles the live data rate, are in [docs/kdcan.md](docs/kdcan.md).
+
+### SocketCAN adapter (Linux)
 
 ```
 [Laptop] --USB--> [Innomaker USB2CAN] --DB9 Cable--> [OBD2 Port on BMW]
 ```
 
-### 2. Verify the Adapter is Detected
-
-When you plug in the USB2CAN, it should be detected automatically:
-
 ```bash
-# Check if the adapter is recognized
+# The adapter should register as can0
 dmesg | tail -10
 
-# You should see something like:
-# usb 1-1: new full-speed USB device
-# gs_usb 1-1:1.0: registered CAN device can0
-```
-
-### 3. Bring Up the CAN Interface
-
-```bash
-# Set up the CAN interface (500kbps for BMW)
+# Bring up the CAN interface (500kbps for BMW)
 sudo ip link set can0 up type can bitrate 500000
-
-# Verify it's up
 ip link show can0
 ```
 
-### 4. (Optional) Auto-Setup on Boot
-
-Create a systemd service or add to `/etc/network/interfaces`:
-
-```bash
-# /etc/network/interfaces.d/can0
-auto can0
-iface can0 can static
-    bitrate 500000
-```
-
-Or create udev rule `/etc/udev/rules.d/99-can.rules`:
+To bring it up automatically, add a udev rule `/etc/udev/rules.d/99-can.rules`:
 
 ```
 ACTION=="add", SUBSYSTEM=="net", KERNEL=="can*", RUN+="/sbin/ip link set %k up type can bitrate 500000"
@@ -159,29 +141,31 @@ e92-redline --debug
 ### Command Line Options
 
 ```
-usage: e92-redline [-h] [--debug] [--log-dir LOG_DIR] [--config CONFIG] [--version]
+usage: e92-redline [-h] [--debug] [--log-dir LOG_DIR] [--config CONFIG] [--port PORT]
+                   [--simulate] [--version]
 
 E92Redline - BMW E92 M3 Diagnostic Tool
 
 options:
-  -h, --help         show this help message and exit
-  --debug, -d        Enable debug logging
-  --log-dir LOG_DIR  Custom log directory (default: ./logs)
-  --config CONFIG    Path to configuration file
-  --version, -v      show program's version number and exit
+  -h, --help            show this help message and exit
+  --debug, -d           Enable debug logging
+  --log-dir LOG_DIR     Custom log directory (default: ./logs)
+  --config, -c CONFIG   Path to configuration file
+  --port, -p PORT       Extra K+DCAN serial port to offer, e.g. COM5 or a pty from
+                        tools/fake_kdcan.py
+  --simulate            Offer a simulated K+DCAN cable so Live Data works without the car
+  --version, -v         show program's version number and exit
 ```
 
 ## Workflow Guide
 
 ### 1. Connect to Vehicle
 
-1. Connect USB2CAN to laptop
-2. Connect DB9-to-OBD2 cable to USB2CAN and vehicle
-3. Turn ignition ON (engine OFF recommended)
-4. Set up CAN interface: `sudo ip link set can0 up type can bitrate 500000`
-5. Launch E92Redline: `python -m e92_redline`
-6. The app will detect `can0` - click "Connect"
-7. Vehicle info (VIN, series, engine) will display in the sidebar
+1. Plug the K+DCAN cable into the laptop and the car (or set up a SocketCAN adapter, see above)
+2. Turn ignition ON (engine OFF recommended for diagnostics; it can run for Live Data)
+3. Launch E92Redline: `python -m e92_redline`
+4. Pick the cable from the list (it's listed first) and click "Connect". "Test Adapter" checks that the car answers first
+5. Vehicle info (VIN, series, engine) will display in the sidebar
 
 ### 2. Quick Test (Module Scan)
 
@@ -218,7 +202,9 @@ The page polls standard OBD-II values from the engine computer, each at its own 
 | Mass air flow | 5 Hz | Ambient air temperature | 0.2 Hz |
 | Vehicle speed | 5 Hz | Module voltage | 1 Hz |
 
-The RPM bar turns amber above 7,500 rpm. If a tile stays at `--`, the car isn't answering that value over OBD-II (see Troubleshooting).
+The RPM bar turns amber above 7,500 rpm. On Start the page asks the engine computer which values it supports; tiles for the ones it doesn't report show `n/a` and aren't polled, so they don't slow the rest down.
+
+Over a K+DCAN cable every value is a full serial round trip, so the overall rate is lower than on a CAN adapter; `e92-redline-cablecheck` prints the requests per second your setup actually gets, and the 1 ms latency setting in [docs/kdcan.md](docs/kdcan.md) raises it.
 
 ### 5. Service Functions
 
@@ -244,7 +230,20 @@ The RPM bar turns amber above 7,500 rpm. If a tile stays at `--`, the car isn't 
 
 ## Troubleshooting
 
-### A Live Data tile stays at "--"
+### The K+DCAN cable isn't listed, or won't connect
+
+1. Run `e92-redline-cablecheck --debug` and read what it says
+2. Linux: `Permission denied` means you're not in the `dialout` group yet (log out and back in after adding yourself)
+3. Windows: the cable must appear under Device Manager → Ports (COM & LPT); close INPA/ISTA/other apps using it
+4. macOS: use the `/dev/cu.usbserial-…` port
+
+### Connected over K+DCAN but Live Data says "No OBD-II answer"
+
+1. Ignition must be ON (key position 2); the Connect page warns if the cable reports it off
+2. Cable fully seated; if it has a K-line/D-CAN switch, set it to D-CAN
+3. Run `e92-redline-cablecheck --try-lines --debug` and open an issue with the output
+
+### A Live Data tile shows "n/a" or stays at "--"
 
 The engine computer doesn't report that value over standard OBD-II. The rest of the page keeps working; the poller simply skips values that get no reply. Some S65-specific data (such as per-cylinder misfire counts) is only available through BMW's own diagnostic identifiers and isn't supported yet.
 
@@ -325,7 +324,21 @@ pytest --cov=e92_redline --cov-report=html
 
 ### Testing Without a Car
 
-`tools/fake_ecu.py` simulates the engine computer on a virtual CAN bus, answering every Live Data request with a sweeping RPM and plausible values.
+The quickest way, on any OS:
+
+```bash
+e92-redline --simulate     # pick "K+DCAN simulator" on the Connect page
+```
+
+To exercise the real serial code path on Linux/macOS, run a simulated cable on a pseudo-terminal:
+
+```bash
+python tools/fake_kdcan.py           # prints e.g. /dev/pts/4
+e92-redline --port /dev/pts/4
+e92-redline-cablecheck /dev/pts/4    # or check it from the command line
+```
+
+On Linux you can also simulate a SocketCAN setup: `tools/fake_ecu.py` answers on a virtual CAN bus.
 
 ```bash
 # One-time per boot: create the virtual CAN interface

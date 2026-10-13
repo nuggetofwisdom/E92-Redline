@@ -41,6 +41,19 @@ def parse_arguments() -> argparse.Namespace:
         help="Path to configuration file",
     )
     parser.add_argument(
+        "--port",
+        "-p",
+        action="append",
+        default=[],
+        metavar="PORT",
+        help="Extra K+DCAN serial port to offer, e.g. COM5 or a pty from tools/fake_kdcan.py",
+    )
+    parser.add_argument(
+        "--simulate",
+        action="store_true",
+        help="Offer a simulated K+DCAN cable so Live Data works without the car",
+    )
+    parser.add_argument(
         "--version",
         "-v",
         action="version",
@@ -64,6 +77,8 @@ def main() -> NoReturn:
 
     # Load configuration
     config = load_config(args.config)
+    config.connection.extra_ports = list(args.port)
+    config.connection.simulate = args.simulate
 
     # Import PyQt6 after argument parsing to avoid slow startup for --help
     try:

@@ -102,13 +102,13 @@ class StatusIndicator(QFrame):
     def set_adapter_detected(self, count: int, names: list[str]) -> None:
         """Set adapter detection status."""
         if count == 0:
-            self._adapter_label.setText("No CAN adapter")
+            self._adapter_label.setText("No adapter")
             self._adapter_label.setStyleSheet("color: #cc6600;")
         else:
             iface_list = ", ".join(names[:2])
             if count > 2:
                 iface_list += f" (+{count - 2})"
-            self._adapter_label.setText(f"CAN: {iface_list}")
+            self._adapter_label.setText(f"Adapter: {iface_list}")
             self._adapter_label.setStyleSheet("color: #00cc00;")
 
     def set_connected(self, interface: str) -> None:
@@ -630,8 +630,9 @@ class MainWindow(QMainWindow):
             self._pages["quick_test"].set_scanner(self._module_scanner)
             self._pages["fault_memory"].set_uds_client(self._uds_client)
             self._pages["services"].set_service_manager(self._service_manager)
-            iface = self._connection_manager.current_interface
-            self._pages["live_data"].set_channel(iface.name if iface else None)
+            source = self._connection_manager.obd_source_factory()
+            if source:
+                self._pages["live_data"].set_source(*source)
 
             # Try to read VIN from vehicle
             self._read_vehicle_info()
@@ -648,7 +649,7 @@ class MainWindow(QMainWindow):
 
     def _on_disconnected(self) -> None:
         """Handle disconnection."""
-        self._pages["live_data"].set_channel(None)
+        self._pages["live_data"].set_source(None)
         self._enable_pages(False)
         self._vehicle_info_panel.clear_info()
         self.connection_changed.emit(False)
@@ -662,6 +663,7 @@ class MainWindow(QMainWindow):
         try:
             # Read VIN from DME (engine ECU) using Read Data By Identifier
             # VIN is typically at DID 0xF190 (standard UDS)
+            self._uds_client.set_target(0x12)  # DME
             vin = self._uds_client.read_vin()
             if vin:
                 self._vehicle_profile.vin = vin
@@ -697,7 +699,7 @@ class MainWindow(QMainWindow):
             "<h2>E92Redline</h2>"
             "<p>Version 0.1.0</p>"
             "<p>BMW E92 M3 Diagnostic Tool</p>"
-            "<p>A production-grade diagnostic GUI tool using SocketCAN.</p>"
+            "<p>Live data and diagnostics over a K+DCAN cable or a SocketCAN adapter.</p>"
             "<hr>"
             "<p><b>What this tool does NOT do:</b></p>"
             "<ul>"

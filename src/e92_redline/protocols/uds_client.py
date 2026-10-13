@@ -421,23 +421,20 @@ class UDSClient:
         Returns:
             VIN string if successful, None if failed
         """
-        # Standard UDS DID for VIN is 0xF190
-        VIN_DID = 0xF190
-
-        try:
-            response = self.read_data_by_id(VIN_DID)
-            if response.is_positive and response.data:
-                # Skip the DID echo (2 bytes) and decode VIN
-                vin_data = response.data[2:] if len(response.data) > 2 else response.data
-                # VIN is typically ASCII, 17 characters
-                vin = vin_data.decode("ascii", errors="ignore").strip()
-                # Validate VIN length
+        # UDS ReadDataByIdentifier F190 first; the E9x MSS60 DME is KWP2000-era and
+        # answers ReadECUIdentification 0x1A 0x90 instead. (request, echo bytes to skip)
+        attempts = ((0x22, bytes([0xF1, 0x90]), 2), (0x1A, bytes([0x90]), 1))
+        for service_id, request, skip in attempts:
+            try:
+                response = self.send_request(service_id, request)
+            except Exception as e:
+                logger.warning(f"Failed to read VIN (service 0x{service_id:02X}): {e}")
+                continue
+            if response.positive and response.data:
+                vin = response.data[skip:].decode("ascii", errors="ignore").strip("\x00 ")
                 if len(vin) >= 11:  # Minimum reasonable VIN length
                     return vin
-            return None
-        except Exception as e:
-            logger.warning(f"Failed to read VIN: {e}")
-            return None
+        return None
 
     def write_data_by_id(self, data_id: int, data: bytes) -> UDSResponse:
         """

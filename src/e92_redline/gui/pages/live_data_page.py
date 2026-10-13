@@ -6,6 +6,7 @@ a scrolling history plot, and optional CSV logging.
 import csv
 import time
 from collections import deque
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from PyQt6.QtWidgets import (
 
 from e92_redline.core.app_logging import get_logger
 from e92_redline.live_data.definitions import PidDef, load_pids
+from e92_redline.live_data.obd_reader import ObdSource
 from e92_redline.live_data.poller import LivePoller
 from e92_redline.live_data.units import convert, display_unit
 
@@ -66,6 +68,18 @@ class ValueTile(QFrame):
         shown, _ = convert(value, self._pid.unit, self._imperial)
         self._value.setText(f"{shown:.0f}" if abs(shown) >= 100 else f"{shown:.1f}")
 
+    def set_unavailable(self) -> None:
+        self._raw = None
+        self._value.setText("n/a")
+        self._value.setStyleSheet("color: #666666;")
+        self.setToolTip("The engine computer doesn't report this value over OBD-II.")
+
+    def reset(self) -> None:
+        self._raw = None
+        self._value.setText("--")
+        self._value.setStyleSheet("color: #ffffff;")
+        self.setToolTip("")
+
     def set_imperial(self, imperial: bool) -> None:
         self._imperial = imperial
         self._unit.setText(display_unit(self._pid.unit, imperial))
@@ -77,7 +91,8 @@ class LiveDataPage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._pids = load_pids()
-        self._channel: str | None = None
+        self._source_factory: Callable[[], ObdSource] | None = None
+        self._source_label: str | None = None
         self._poller: LivePoller | None = None
         self._t0 = time.monotonic()
         self._history = {
@@ -184,11 +199,16 @@ class LiveDataPage(QWidget):
 
     # ---------- wiring from MainWindow ----------
 
-    def set_channel(self, channel: str | None) -> None:
-        """Called on connect (with 'can0'/'vcan0') and on disconnect (None)."""
-        if channel is None:
+    def set_source(
+        self, factory: Callable[[], ObdSource] | None, label: str | None = None
+    ) -> None:
+        """Called on connect with a reader factory, and on disconnect with None."""
+        if factory is None:
             self.stop()
-        self._channel = channel
+        self._source_factory = factory
+        self._source_label = label
+        if factory is not None:
+            self._status.setText(f"Connected via {label}. Press Start.")
 
     # ---------- start / stop ----------
 
@@ -199,23 +219,27 @@ class LiveDataPage(QWidget):
             self.start()
 
     def start(self) -> None:
-        if not self._channel:
+        if self._source_factory is None:
             self._status.setText("Not connected.")
             return
+        for tile in self._tiles.values():
+            tile.reset()
         for xs, ys in self._history.values():
             xs.clear()
             ys.clear()
         self._t0 = time.monotonic()
         if self._log_box.isChecked():
             self._open_log()
-        self._poller = LivePoller(self._channel, self._pids, self)
+        self._poller = LivePoller(self._source_factory, self._pids, self)
         self._poller.value_ready.connect(self._on_value)
+        self._poller.unsupported.connect(self._on_unsupported)
+        self._poller.status.connect(self._status.setText)
         self._poller.error.connect(self._on_error)
         self._poller.start()
         self._plot_timer.start(100)
         self._start_btn.setText("Stop")
         self._log_box.setEnabled(False)
-        self._status.setText(f"Polling {len(self._pids)} values on {self._channel}")
+        self._status.setText(f"Starting on {self._source_label}...")
 
     def stop(self) -> None:
         if self._poller is not None:
@@ -225,7 +249,7 @@ class LiveDataPage(QWidget):
         self._close_log()
         self._start_btn.setText("Start")
         self._log_box.setEnabled(True)
-        if self._channel:
+        if self._source_factory is not None:
             self._status.setText("Stopped.")
 
     # ---------- data ----------
@@ -245,10 +269,17 @@ class LiveDataPage(QWidget):
         if self._log_writer:
             self._log_writer.writerow([f"{t:.3f}", pid_id, f"{value:.3f}"])
 
+    def _on_unsupported(self, pid_ids: list) -> None:
+        for pid_id in pid_ids:
+            if pid_id in self._tiles:
+                self._tiles[pid_id].set_unavailable()
+            elif pid_id == "rpm":
+                self._rpm_label.setText("RPM n/a")
+
     def _on_error(self, message: str) -> None:
         logger.warning(message)
-        self._status.setText(message)
         self.stop()
+        self._status.setText(message)
 
     def _redraw_plot(self) -> None:
         rpm_x, rpm_y = self._history["rpm"]
